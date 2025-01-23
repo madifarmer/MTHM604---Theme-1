@@ -1,0 +1,210 @@
+---
+title: "Themes 1"
+output:
+  pdf_document: default
+  html_document: default
+---
+#Import data
+```{r}
+#Theme 1
+#Topic 4: Are there patterns in the sensor data that could indicate the 
+# household is limiting their energy use due to financial concerns?
+#sensor data
+#family size >> Electricity bills
+#CO2
+library(tidyverse)
+library(ggplot2)
+library(readr)
+library(dplyr)
+file <- c("06_cco2_1642474.csv", "09_cco2_1642436.csv", "11_cco2_1642164.csv", "13_cco2_1642408.csv", "16_cco2_1642424.csv", "28_cco2_1642437.csv", "29_cco2_1642423s1642471.csv", "34_cco2_1642476.csv", "58_cco2_1642428.csv", "85_cco2_1642399.csv")
+
+# Load and combine data
+data_list <- lapply(seq_along(file), function(i) 
+  {
+  data <- read.csv(file[i])
+  data$House_ID <- paste0("House_", i)  # Add a House_ID column
+  return(data)
+})
+
+
+# View the first few rows
+head(data_list)
+#
+# Check structure and summary
+str(data_list)
+summary(data_list)
+
+```
+
+#Combine files
+```{r}
+# Combine all files into one data frame
+combined_data <- bind_rows(data_list)
+
+# View the first few rows
+head(combined_data)
+
+# Check structure and summary
+str(combined_data)
+summary(combined_data)
+
+# Check for missing values
+colSums(is.na(combined_data))
+
+# Check for duplicates
+combined_data <- combined_data[!duplicated(combined_data), ]
+
+```
+#Standardize Date and Time
+```{r}
+combined_data$datetime <- as.POSIXct(combined_data$datetime, format = "%d/%m/%Y %H:%M", tz = "UTC")
+```
+
+#Normalize CO2 Values by House
+```{r}
+# Standardize CO2 within each house
+standardized_data <- combined_data %>%
+  group_by(House_ID) %>%
+  mutate(Standardized_CO2 = scale(value)) %>% 
+  ungroup()
+
+# Round datetime to the nearest hour
+standardized_data <- standardized_data %>%
+  mutate(Hour = lubridate::floor_date(datetime, unit = "hour"))
+```
+
+
+# Aggregate by house and hour
+```{r}
+# Add a "Hour" column (hour start date)
+combined_data <- combined_data %>%
+  mutate(Hour = floor_date(datetime, unit = "hour"))  # Hourly grouping
+
+# Aggregate by house and hourly
+hourly_data <- combined_data %>%
+  group_by(House_ID, Hour) %>%
+  summarize(Mean_CO2 = mean(value, na.rm = TRUE), .groups = 'drop')  # Calculate hourly mean CO2
+
+
+#hourly_data <- standardized_data %>%
+#  group_by(House_ID, Hour) %>%
+#  summarize(Mean_Standardized_CO2 = mean(Standardized_CO2, na.rm = TRUE), .groups = 'drop')
+
+```
+
+# Aggregate by house and day
+```{r}
+# Add a "Day" column (day start date)
+combined_data <- combined_data %>%
+  mutate(Day = floor_date(datetime, unit = "day"))  # daily grouping
+
+# Aggregate by house and daily
+daily_data <- combined_data %>%
+  group_by(House_ID, Day) %>%
+  summarize(Mean_CO2 = mean(value, na.rm = TRUE), .groups = 'drop')  # Calculate daily mean CO2
+```
+
+
+# Aggregate by house and week
+```{r}
+# Add a "Week" column (week start date)
+combined_data <- combined_data %>%
+  mutate(Week = floor_date(datetime, unit = "week"))  # Weekly grouping
+
+# Aggregate by house and weekly
+weekly_data <- combined_data %>%
+  group_by(House_ID, Week) %>%
+  summarize(Mean_CO2 = mean(value, na.rm = TRUE), .groups = 'drop')  # Calculate weekly mean CO2
+
+```
+
+# Aggregate by house and month
+```{r}
+# Add a "Month" column (month start date)
+combined_data <- combined_data %>%
+  mutate(Month = floor_date(datetime, unit = "month"))  # Monthly grouping
+
+# Aggregate by house and month
+monthly_data <- combined_data %>%
+  group_by(House_ID, Month) %>%
+  summarize(Mean_CO2 = mean(value, na.rm = TRUE), .groups = 'drop')  # Calculate monthly mean CO2
+
+```
+
+
+#Plot graphs for hourly
+```{r}
+# Create the plot
+ggplot(hourly_data, aes(x = Hour, y = Mean_CO2, color = House_ID, group = House_ID)) +
+  geom_line(size = 1) +   # Line plot
+  geom_point(size = 2) +  # Add points for clarity
+  labs(
+    title = "Hourly Comparison of Mean CO2 Levels Between Houses",
+    x = "Hour",
+    y = "Standardized CO2",
+    color = "House ID"
+  ) +
+  theme_minimal() + # Minimal theme for cleaner look
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotate x-axis labels
+
+
+
+
+```
+#plot graph for daily
+```{r}
+# Plot daily data
+ggplot(daily_data, aes(x = Day, y = Mean_CO2, color = House_ID, group = House_ID)) +
+  geom_line(size = 1) +  # Line plot for daily trends
+  geom_point(size = 2) + # Add points for clarity
+  labs(
+    title = "Daily Comparison of CO2 Levels Between Houses",
+    x = "Day",
+    y = "Mean CO2",
+    color = "House ID"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels
+
+
+```
+
+#plot graph for weekly
+```{r}
+# Plot weekly data
+ggplot(weekly_data, aes(x = Week, y = Mean_CO2, color = House_ID, group = House_ID)) +
+  geom_line(size = 1) +  # Line plot for weekly trends
+  geom_point(size = 2) + # Add points for clarity
+  labs(
+    title = "Weekly Comparison of CO2 Levels Between Houses",
+    x = "Week",
+    y = "Mean CO2",
+    color = "House ID"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels
+
+
+```
+
+
+
+#plot graph for monthly
+```{r}
+
+# Plot monthly data
+ggplot(monthly_data, aes(x = Month, y = Mean_CO2, color = House_ID, group = House_ID)) +
+  geom_line(size = 1) +  # Line plot for monthly trends
+  geom_point(size = 2) + # Add points for clarity
+  labs(
+    title = "Monthly Comparison of CO2 Levels Between Houses",
+    x = "Month",
+    y = "Mean CO2",
+    color = "House ID"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels
+
+
+
+```
